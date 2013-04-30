@@ -1,0 +1,8 @@
+{application, io_libc, [
+  {description, "Fast libc based formatter with io_lib-like api"},
+  {vsn, "0.1"},
+  {registered, []},
+  {applications, [kernel, stdlib]},
+  {mod, {io_libc_app, []}}
+]}.
+
