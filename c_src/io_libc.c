@@ -1,7 +1,7 @@
-#include "erl_nif.h"
 #define _GNU_SOURCE
 #include <string.h>
 #include <stdio.h>
+#include "erl_nif.h"
 
 #define ARG_NONE   0
 #define ARG_INT    1
@@ -52,12 +52,33 @@ io_libc_fwrite(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
 };
 
 
+// Helper marcos for formatting numeric types
+#define fetch_asprintf(fetcher) \
+  switch (consumed) {                 \
+    case 1:                                                           \
+      asprintf(&formatted, fmt_start, fetcher(env, items));           \
+      break;                                                          \
+    case 2:                                                           \
+      e1 = fetch_int(env, items);                                     \
+      asprintf(&formatted, fmt_start, e1, fetcher(env, items));       \
+      break;                                                          \
+    case 3:                                                           \
+      e1 = fetch_int(env, items);                                     \
+      e2 = fetch_int(env, items);                                     \
+      asprintf(&formatted, fmt_start, e1, e2, fetcher(env, items));   \
+      break;                                                          \
+  };                                                                  \
+  break;
+
 int format_first(ErlNifEnv* env, ErlNifBinary* result, char** fmt_start_ptr, ERL_NIF_TERM* items) {
   char* fmt_start = *fmt_start_ptr;
   char* fmt_iter = fmt_start;
   int consumed = 0;
   int fmt_long = 0;
   int arg_type = ARG_NONE;
+
+  // started at the end of line
+  if (*fmt_iter == 0) return 0;
 
   // find first covnertion spec character or string end
   while (*fmt_iter != 0) {
@@ -72,9 +93,6 @@ int format_first(ErlNifEnv* env, ErlNifBinary* result, char** fmt_start_ptr, ERL
     }
     else fmt_iter += 1;
   }
-
-  // started at the end of line
-  if (fmt_iter == fmt_start) return 0;
 
   // find convertion specifier
   while (*fmt_iter != 0){
@@ -127,88 +145,37 @@ int format_first(ErlNifEnv* env, ErlNifBinary* result, char** fmt_start_ptr, ERL
   char* formatted = NULL;
   char* stringbuf;
 
+  int e1, e2;
+
   switch (arg_type) {
     case ARG_NONE:
       asprintf(&formatted, fmt_start);
       break;
-    case ARG_INT:
-      switch (consumed) {
-        case 1:
-          asprintf(&formatted, fmt_start, fetch_int(env, items));
-          break;
-        case 2:
-          asprintf(&formatted, fmt_start, fetch_int(env, items), fetch_int(env, items));
-          break;
-        case 3:
-          asprintf(&formatted, fmt_start, fetch_int(env, items), fetch_int(env, items), fetch_int(env, items));
-          break;
-      };
-      break;
-    case ARG_LONG:
-      switch (consumed) {
-        case 1:
-          asprintf(&formatted, fmt_start, fetch_long(env, items));
-          break;
-        case 2:
-          asprintf(&formatted, fmt_start, fetch_int(env, items), fetch_long(env, items));
-          break;
-        case 3:
-          asprintf(&formatted, fmt_start, fetch_int(env, items), fetch_int(env, items), fetch_long(env, items));
-          break;
-      };
-      break;
-    case ARG_UINT:
-      switch (consumed) {
-        case 1:
-          asprintf(&formatted, fmt_start, fetch_uint(env, items));
-          break;
-        case 2:
-          asprintf(&formatted, fmt_start, fetch_int(env, items), fetch_uint(env, items));
-          break;
-        case 3:
-          asprintf(&formatted, fmt_start, fetch_int(env, items), fetch_int(env, items), fetch_uint(env, items));
-          break;
-      };
-      break;
-    case ARG_ULONG:
-      switch (consumed) {
-        case 1:
-          asprintf(&formatted, fmt_start, fetch_ulong(env, items));
-          break;
-        case 2:
-          asprintf(&formatted, fmt_start, fetch_int(env, items), fetch_ulong(env, items));
-          break;
-        case 3:
-          asprintf(&formatted, fmt_start, fetch_int(env, items), fetch_int(env, items), fetch_ulong(env, items));
-          break;
-      };
-      break;
-    case ARG_DOUBLE:
-      switch (consumed) {
-        case 1:
-          asprintf(&formatted, fmt_start, fetch_double(env, items));
-          break;
-        case 2:
-          asprintf(&formatted, fmt_start, fetch_int(env, items), fetch_double(env, items));
-          break;
-        case 3:
-          asprintf(&formatted, fmt_start, fetch_int(env, items), fetch_int(env, items), fetch_double(env, items));
-          break;
-      };
-      break;
-    case ARG_STRING:
+    // Numeric types: see macros above
+    case ARG_INT:    fetch_asprintf(fetch_int);
+    case ARG_LONG:   fetch_asprintf(fetch_long);
+    case ARG_UINT:   fetch_asprintf(fetch_uint);
+    case ARG_ULONG:  fetch_asprintf(fetch_ulong);
+    case ARG_DOUBLE: fetch_asprintf(fetch_double);
+
+    case ARG_STRING: // This cannot be handled by that simple macros because of allocation inside fetch_string
       switch (consumed) {
         case 1:
           asprintf(&formatted, fmt_start, stringbuf = fetch_string(env, items));
+          free(stringbuf);
           break;
         case 2:
-          asprintf(&formatted, fmt_start, fetch_int(env, items), stringbuf = fetch_string(env, items));
+          e1 = fetch_int(env, items);
+          asprintf(&formatted, fmt_start, e1, stringbuf = fetch_string(env, items));
+          free(stringbuf);
           break;
         case 3:
-          asprintf(&formatted, fmt_start, fetch_int(env, items), fetch_int(env, items), stringbuf = fetch_string(env, items));
+          e1 = fetch_int(env, items);
+          e2 = fetch_int(env, items);
+          asprintf(&formatted, fmt_start, e1, e2, stringbuf = fetch_string(env, items));
+          free(stringbuf);
           break;
       };
-      free(stringbuf);
       break;
   };
 
