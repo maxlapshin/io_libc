@@ -20,7 +20,7 @@ double          fetch_double(ErlNifEnv*, ERL_NIF_TERM*);
 char*           fetch_string(ErlNifEnv*, ERL_NIF_TERM*);
 
 // Iterable function which gets first convertion spec from input and appends formatted data to given binary
-int format_first(ErlNifEnv*, ErlNifBinary*, char*, ERL_NIF_TERM*);
+int format_first(ErlNifEnv*, ErlNifBinary*, char**, ERL_NIF_TERM*);
 
 // fwrite implementation
 static ERL_NIF_TERM
@@ -40,7 +40,7 @@ io_libc_fwrite(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
   // Get escape sequences one-by-one from fmt with according values from items
   char *cur_fmt = fmt;
   int format_result;
-  while ((format_result = format_first(env, &result, cur_fmt, &items)) > 0) {
+  while ((format_result = format_first(env, &result, &cur_fmt, &items)) > 0) {
     // Nothing to do here, everything is ok
   }
 
@@ -52,7 +52,8 @@ io_libc_fwrite(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
 };
 
 
-int format_first(ErlNifEnv* env, ErlNifBinary* result, char* fmt_start, ERL_NIF_TERM* items) {
+int format_first(ErlNifEnv* env, ErlNifBinary* result, char** fmt_start_ptr, ERL_NIF_TERM* items) {
+  char* fmt_start = *fmt_start_ptr;
   char* fmt_iter = fmt_start;
   int consumed = 0;
   int fmt_long = 0;
@@ -211,20 +212,22 @@ int format_first(ErlNifEnv* env, ErlNifBinary* result, char* fmt_start, ERL_NIF_
       break;
   };
 
-  // Put back saved byte
+  // Put back saved byte and move format pointer
   *fmt_iter = kept_fmt_byte;
+  *fmt_start_ptr = fmt_iter;
 
   // asprintf did not run or returned error
   if (formatted == NULL || formatted < 0) return -2;
 
   // remember where we start copying formatted part
-  char* copy_dest = (char*)result->data + result->size;
+  int oldsize = result->size;
 
   // Here we are sure formatted contains zero-terminated string, so strlen is safe
   int part_length = strlen(formatted);
-  enif_realloc_binary(result, result->size + part_length);
+  enif_realloc_binary(result, oldsize + part_length);
 
   // Do copy from formatted to result buffer
+  char* copy_dest = (char*)result->data + oldsize;
   memcpy(copy_dest, formatted, part_length);
 
   // free memory allocated by asprintf
