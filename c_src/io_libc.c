@@ -127,6 +127,9 @@ int format_first(ErlNifEnv* env, ErlNifBinary* result, char** fmt_start_ptr, ERL
     // We don't support references to argument positions -> return error
     if (*fmt_iter == '$') return -1;
 
+    // Support long
+    if (*fmt_iter == 'l') fmt_long = 1;
+
     // At last, go to next character
     fmt_iter++;
   };
