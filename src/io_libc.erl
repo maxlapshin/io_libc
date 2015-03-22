@@ -1,6 +1,8 @@
 -module(io_libc).
 
 -export([fwrite/2, format/2]).
+-export([utc_to_datetime/1]).
+-export([init_nif/0]).
 
 -on_load(init_nif/0).
 
@@ -23,4 +25,8 @@ format(Format, Data) ->
   fwrite(Format, Data).
 
 fwrite(_Format, _Data) ->
-  erlang:error({io_libc, nif_not_loaded}).
+  erlang:nif_error({io_libc, nif_not_loaded}).
+
+
+utc_to_datetime(_) ->
+  erlang:nif_error({io_libc, nif_not_loaded}).

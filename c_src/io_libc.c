@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <string.h>
 #include <stdio.h>
+#include <time.h>
 #include "erl_nif.h"
 
 #define ARG_NONE   0
@@ -18,6 +19,35 @@ unsigned int    fetch_uint(ErlNifEnv*, ERL_NIF_TERM*);
 unsigned long   fetch_ulong(ErlNifEnv*, ERL_NIF_TERM*);
 double          fetch_double(ErlNifEnv*, ERL_NIF_TERM*);
 char*           fetch_string(ErlNifEnv*, ERL_NIF_TERM*);
+
+
+static ERL_NIF_TERM
+utc_to_datetime(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+  if(argc != 1) {
+    return enif_make_badarg(env);
+  }
+  unsigned int utc;
+  if(!enif_get_uint(env, argv[0], &utc)) {
+    return enif_make_badarg(env);
+  }
+
+  time_t now = utc;
+  struct tm result;
+  gmtime_r(&now, &result);
+  return enif_make_tuple2(env,
+    enif_make_tuple3(env,
+      enif_make_int(env, result.tm_year + 1900),
+      enif_make_int(env, result.tm_mon + 1),
+      enif_make_int(env, result.tm_mday)
+    ),
+    enif_make_tuple3(env,
+      enif_make_int(env, result.tm_hour),
+      enif_make_int(env, result.tm_min),
+      enif_make_int(env, result.tm_sec)
+    )
+  );
+}
+
 
 // Iterable function which gets first convertion spec from input and appends formatted data to given binary
 int format_first(ErlNifEnv*, ErlNifBinary*, char**, ERL_NIF_TERM*);
@@ -330,7 +360,8 @@ static int upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data, ERL_N
 
 // Erlang to C function mapping
 static ErlNifFunc io_libc_funcs[] = {
-  {"fwrite", 2, io_libc_fwrite}
+  {"fwrite", 2, io_libc_fwrite},
+  {"utc_to_datetime", 1, utc_to_datetime}
 };
 
 ERL_NIF_INIT(io_libc, io_libc_funcs, NULL, NULL, upgrade, NULL)
